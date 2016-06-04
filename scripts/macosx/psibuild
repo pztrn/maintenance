@@ -227,7 +227,9 @@ EOF
 			sh ${PSI_DIR}/maintenance/scripts/macosx/otrdeps.sh ${OTRDEPS_DIR} ${PSI_DIR}/build/src/plugins/generic/${plugin} 2>/dev/null || die "make ${plugin} plugin failed"
         else
             # This is default plugin compilation sequence.
-            if [ -d "${PSI_DIR}/build/src/plugins/generic/${plugin}" ]; then
+            # Note: directory check might not always work (why? IDK!).
+            # So we're cheching if we have ".pro" in plugin name.
+            if [ "${plugin/\.pro//}" == "${plugin}" ]; then
                 cd "${PSI_DIR}/build/src/plugins/generic/${plugin}"
                 log "Compiling ${plugin} plugin"
                 ${QMAKE} ${plugin}.pro >> "${PSI_DIR}/logs/plugins/${plugin}-qmake.log" 2>&1
@@ -302,7 +304,9 @@ function copy_libraries()
     done
 
     # Copy QCA plugins
-    cp -R "${PSIBUILD_DEPS_DIR}/dep_root/lib/qca/crypto/*.dylib" "${PSIAPP_DIR}/Frameworks"
+    for qca_plugin in `ls ${PSIBUILD_DEPS_DIR}/dep_root/lib/qca/crypto/`; do
+        cp -a "${PSIBUILD_DEPS_DIR}/dep_root/lib/qca/crypto/${qca_plugin}" "${PSIAPP_DIR}/Frameworks"
+    done
 
     # Go thru all bundled libraries, and check for dependencies.
     # If something is outside of bundle - install it.
