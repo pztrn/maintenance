@@ -300,6 +300,15 @@ function configure_env_prepare_dir_variables()
 }
 
 #####################################################################
+# This function will tune DYLD_LIBRARY_PATH variable.
+#####################################################################
+function configure_env_tune_dyld_path()
+{
+    log "Tuning DYLD_LIBRARY_PATH to point to our dep_root..."
+    export DYLD_LIBRARY_PATH="${PSIBUILD_DEPS_DIR}/dep_root/lib/:${DYLD_LIBRARY_PATH}"
+}
+
+#####################################################################
 # This function will tune PATH variable.
 #####################################################################
 configure_env_tune_path()
@@ -352,6 +361,7 @@ function configure_env_prepare_environment()
 	configure_env_prepare_buildflags
     configure_env_tune_path
     configure_env_tune_pkgconfig
+    configure_env_tune_dyld_path
 }
 
 configure_env_detect_standalone

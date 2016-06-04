@@ -268,7 +268,7 @@ function build_deps_growl()
 function build_deps_minizip()
 {
 	log "Detecting minizip library..."
-	if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/lib/libminizip.dylib" ]; then
+	if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/lib/libz.dylib" ]; then
 		log "Downloading minizip (zlib) sources..."
 		mkdir -p "${PSIBUILD_DEPS_DIR}/zlib"
 		cd "${PSIBUILD_DEPS_DIR}/zlib"
@@ -281,36 +281,57 @@ function build_deps_minizip()
         log "Unpacking sources..."
 		tar -xf "${DEP_MINIZIP_FILENAME}"
         cd "zlib-${DEP_MINIZIP_VERSION}"
+
+        # Configuration.
         log "Configuring ZLib..."
         ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" >> "${PSIBUILD_LOGS_DIR}/zlib-configure.log" 2>&1
         if [ $? -ne 0 ]; then
             action_failed "zlib configuration" "${PSI_DIR}/logs/zlib-configure.log"
         fi
+
+        # Compilation.
         log "Compiling ZLib..."
         ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/zlib-make.log" 2>&1
         if [ $? -ne 0 ]; then
             action_failed "zlib compilation" "${PSI_DIR}/logs/zlib-make.log"
         fi
+
+        # Installation.
+        log "Installing Zlib..."
+        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/zlib-install.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "zlib installation" "${PSI_DIR}/logs/zlib-install.log"
+        fi
+    fi
+
+    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/lib/libminizip.dylib" ]; then
         cd contrib/minizip
         # Sed magic from https://github.com/Homebrew/homebrew-core/blob/master/Formula/minizip.rb
         log "Executing sed magic..."
         sed -i "" "s/\-L\$\(zlib_top_builddir\)/\$\(zlib_top_builddir\)\/libz.a/" Makefile.am
         sed -i "" "s/\-version\-info\ 1\:0\:0\ \-lz/\-version\-info\ 1\:0\:0/" Makefile.am
         sed -i "" "s/libminizip.la\ \-lz/libminizip.la/" Makefile.am
+
+        # Configuration.
         log "Configuring minizip..."
         autoreconf -fi  >> "${PSIBUILD_LOGS_DIR}/minizip-configure.log" 2>&1
         if [ $? -ne 0 ]; then
             action_failed "minizip configuration" "${PSI_DIR}/logs/minizip-configure.log"
         fi
+
         ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" >> "${PSIBUILD_LOGS_DIR}/minizip-configure.log" 2>&1
         if [ $? -ne 0 ]; then
             action_failed "minizip configuration" "${PSI_DIR}/logs/minizip-configure.log"
         fi
+
+        # Compilation.
         log "Compiling minizip..."
         ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/minizip-make.log" 2>&1
         if [ $? -ne 0 ]; then
             action_failed "minizip compilation" "${PSI_DIR}/logs/minizip-make.log"
         fi
+
+        # Installation.
         log "Installing minizip..."
         ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/minizip-install.log" 2>&1
         if [ $? -ne 0 ]; then
@@ -380,6 +401,10 @@ function build_deps_qca()
         tar -xf "${DEP_QCA_FILENAME}"
         cd "qca-${DEP_QCA_VERSION}"
         log "Configuring QCA..."
+        # Remove build directory if it exists. We always want clean build.
+        if [ -d "build" ]; then
+            rm -rf build
+        fi
         mkdir build && cd $_
         cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${PSIBUILD_DEPS_DIR}/dep_root" -DQCA_PREFIX_INSTALL_DIR="${PSIBUILD_DEPS_DIR}/dep_root" -DQT_INSTALL_LIBS="${QTDIR}" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.5 -DQT4_BUILD=ON -DBUILD_TESTS=OFF -DUSE_RELATIVE_PATHS=ON -DQT_QMAKE_EXECUTABLE="${QTDIR}/bin/qmake" ..  >> "${PSIBUILD_LOGS_DIR}/qca-configure.log" 2>&1
         if [ $? -ne 0 ]; then
