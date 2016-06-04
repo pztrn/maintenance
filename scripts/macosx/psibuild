@@ -753,20 +753,6 @@ function prepare_sources()
 }
 
 #####################################################################
-# This function exports Qt version.
-#####################################################################
-function use_qt()
-{
-    local version=$1
-    local path=$2
-    local path=`echo ${path} | sed -e "s/\/\//\//"`
-    export QTDIR="${path}"
-    export QT_VERSION="${version}"
-    export QT_VERSION_MAJOR="${version:0:1}"
-    log "Will use Qt-${QT_VERSION} located at '${QTDIR}'"
-}
-
-#####################################################################
 # This function just shows help text when "--help" or "-h" was passed
 # as parameters.
 #####################################################################

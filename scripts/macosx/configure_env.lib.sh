@@ -163,7 +163,7 @@ function configure_env_detect_qt()
         if [ ${#qt_v} -eq 0 ]; then
             local qt_v=`echo ${QTDIR} | awk -F"/" {' print $(NF-1) '}`
         fi
-        use_qt "${qt_v}" "${QTDIR}"
+        configure_env_use_qt "${qt_v}" "${QTDIR}"
     else
         # Try to autodetect installed versions. We should detect one version
         # for Qt4 and one version for Qt5.
@@ -220,21 +220,21 @@ function configure_env_detect_qt()
             echo
             if [ "${qt_to_use}" == "1" ]; then
                 log "Will use Qt4."
-                use_qt "${qt4_version}" "/usr/local/Trolltech/Qt-${qt4_version}"
+                configure_env_use_qt "${qt4_version}" "/usr/local/Trolltech/Qt-${qt4_version}"
             elif [ "${qt_to_use}" == "2" ]; then
                 log "Will use Qt5."
-                use_qt "${qt5_version}" "/usr/local/Qt-${qt5_version}"
+                configure_env_use_qt "${qt5_version}" "/usr/local/Qt-${qt5_version}"
             fi
         elif [ ${qt4_found} -eq 1 -a ${qt5_found} -eq 1 -a ${PREFER_QT5} -eq 1 ]; then
             log "Found both Qt4 and Qt5, but \"--prefer-qt5\" parameter was passed. Forcing Qt5."
-            use_qt "${qt5_version}" "/usr/local/Qt-${qt5_version}"
+            configure_env_use_qt "${qt5_version}" "/usr/local/Qt-${qt5_version}"
         else
             if [ ${qt4_found} -eq 1 -a ${qt5_found} -eq 0 ]; then
                 log "Will use Qt4."
-                use_qt "${qt4_version}" "/usr/local/Trolltech/Qt-${qt4_version}"
+                configure_env_use_qt "${qt4_version}" "/usr/local/Trolltech/Qt-${qt4_version}"
             elif [ ${qt4_found} -eq 0 -a ${qt5_found} -eq 1 ]; then
                 log "Will use Qt5."
-                use_qt "${qt5_version}" "/usr/local/Qt-${qt5_version}"
+                configure_env_use_qt "${qt5_version}" "/usr/local/Qt-${qt5_version}"
             fi
         fi
     fi
@@ -305,8 +305,26 @@ function configure_env_prepare_dir_variables()
 function configure_env_tune_pkgconfig()
 {
     log "Forcing pkg-config to take a look into our dependencies root's pkg-config directory..."
-    export PKG_CONFIG_PATH="${PSIBUILD_DEPS_DIR}/dep_root/lib/pkgconfig:${PKG_CONFIG_PATH}"
+    # We have nothing more on clean system. And we need no more for clean build.
+    export PKG_CONFIG_PATH="${PSIBUILD_DEPS_DIR}/dep_root/lib/pkgconfig:/usr/lib/pkgconfig/:${PKG_CONFIG_PATH}"
     log "PKG_CONFIG_PATH is now: ${PKG_CONFIG_PATH}"
+}
+
+#####################################################################
+# This function exports Qt version.
+#####################################################################
+function configure_env_use_qt()
+{
+    local version=$1
+    local path=$2
+    local path=`echo ${path} | sed -e "s/\/\//\//"`
+    export QTDIR="${path}"
+    export QT_VERSION="${version}"
+    export QT_VERSION_MAJOR="${version:0:1}"
+    if [ $QT_VERSION_MAJOR -eq 4 ]; then
+        PKG_CONFIG_PATH="/usr/local/Qt4.8/lib/pkgconfig"
+    fi
+    log "Will use Qt-${QT_VERSION} located at '${QTDIR}'"
 }
 
 #####################################################################
