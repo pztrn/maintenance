@@ -304,8 +304,10 @@ function copy_libraries()
     done
 
     # Copy QCA plugins
-    for qca_plugin in `ls ${PSIBUILD_DEPS_DIR}/dep_root/lib/qca/crypto/`; do
-        cp -a "${PSIBUILD_DEPS_DIR}/dep_root/lib/qca/crypto/${qca_plugin}" "${PSIAPP_DIR}/Frameworks"
+    cp -R "${PSIBUILD_DEPS_DIR}/dep_root/lib/qca" "${PSIAPP_DIR}/Frameworks"
+    for qca_plugin in `ls ${PSIAPP_DIR}/Frameworks/qca/crypto/`; do
+        # Linking against bundled QCA.
+        install_name_tool -change "lib/qca.framework/Versions/${DEP_QCA_VERSION}/qca" "@executable_path/../Frameworks/qca.framework/Versions/${DEP_QCA_VERSION}/qca" "${PSIAPP_DIR}/Frameworks/qca/crypto/${qca_plugin}"
     done
 
     # Go thru all bundled libraries, and check for dependencies.
@@ -358,7 +360,10 @@ function copy_resources()
 	for plugin in ${PLUGINS}; do
         log "Installing plugin ${plugin}"
 		cd "${PSI_DIR}/build/src/plugins/generic/${plugin}/"
-        cp *.dylib "${PSIAPP_DIR}/Resources/plugins/"
+        dylibs=`find . -type f -name "*.dylib"`
+        for lib in ${dylibs[@]}; do
+            cp "${lib}" "${PSIAPP_DIR}/Resources/plugins/"
+        done
     done
 
     log "Copying libraries..."

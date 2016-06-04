@@ -41,8 +41,8 @@ DEP_PKGCONFIG_FILENAME="pkg-config-${DEP_PKGCONFIG_VERSION}.tar.gz"
 # Psimedia
 DEP_PSIMEDIA_SOURCE_URL="https://github.com/psi-plus/psimedia.git"
 # Qt Cryptographic Architecture
-DEP_QCA_SOURCE_URL="http://delta.affinix.com/download/qca/2.0/"
-DEP_QCA_VERSION="2.1.0"
+DEP_QCA_VERSION="2.1.1"
+DEP_QCA_SOURCE_URL="http://quickgit.kde.org/?p=qca.git&a=snapshot&h=a0c9a2872811497a53672a7880b8a0ece2a7e7d2&fmt=tgz"
 DEP_QCA_FILENAME="qca-${DEP_QCA_VERSION}.tar.gz"
 
 #####################################################################
@@ -446,6 +446,7 @@ function build_deps_psimedia()
 
 #####################################################################
 # qca installation/detection
+# Sources are obtained from git tag, see https://quickgit.kde.org/?p=qca.git
 #####################################################################
 function build_deps_qca()
 {
@@ -455,21 +456,21 @@ function build_deps_qca()
         mkdir -p "${PSIBUILD_DEPS_DIR}/qca"
         cd "${PSIBUILD_DEPS_DIR}/qca"
         if [ ! -f "${PSIBUILD_DEPS_DIR}/qca/${DEP_QCA_FILENAME}" ]; then
-            curl -L "${DEP_QCA_SOURCE_URL}/${DEP_QCA_FILENAME}" -o "${DEP_QCA_FILENAME}"
+            curl -L "${DEP_QCA_SOURCE_URL}" -o "${DEP_QCA_FILENAME}"
         else
             log "Sources already downloaded."
-            rm -rf "qca-${DEP_QCA_VERSION}"
+            rm -rf "qca"
         fi
         log "Unpacking sources..."
         tar -xf "${DEP_QCA_FILENAME}"
-        cd "qca-${DEP_QCA_VERSION}"
+        cd "qca"
         log "Configuring QCA..."
         # Remove build directory if it exists. We always want clean build.
         if [ -d "build" ]; then
             rm -rf build
         fi
         mkdir build && cd $_
-        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${PSIBUILD_DEPS_DIR}/dep_root" -DQCA_PREFIX_INSTALL_DIR="${PSIBUILD_DEPS_DIR}/dep_root" -DQT_INSTALL_LIBS="${QTDIR}" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.5 -DQT4_BUILD=ON -DBUILD_TESTS=OFF -DUSE_RELATIVE_PATHS=ON -DQT_QMAKE_EXECUTABLE="${QTDIR}/bin/qmake" -DBUILD_PLUGINS=auto ..  >> "${PSIBUILD_LOGS_DIR}/qca-configure.log" 2>&1
+        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${PSIBUILD_DEPS_DIR}/dep_root" -DQCA_PREFIX_INSTALL_DIR="${PSIBUILD_DEPS_DIR}/dep_root" -DQT_INSTALL_LIBS="${QTDIR}" -DQT4_BUILD=ON -DBUILD_TESTS=OFF -DUSE_RELATIVE_PATHS=ON -DQT_QMAKE_EXECUTABLE="${QTDIR}/bin/qmake" -DBUILD_PLUGINS=auto ..  >> "${PSIBUILD_LOGS_DIR}/qca-configure.log" 2>&1
         if [ $? -ne 0 ]; then
             action_failed "qca configuration" "${PSI_DIR}/logs/qca-configure.log"
         fi
