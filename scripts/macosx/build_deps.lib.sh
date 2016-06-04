@@ -6,6 +6,10 @@ DEP_PKGCONFIG_FILENAME="pkg-config-${DEP_PKGCONFIG_VERSION}.tar.gz"
 DEP_AUTOCONF_SOURCE_URL="http://ftp.gnu.org/gnu/autoconf/"
 DEP_AUTOCONF_VERSION="2.69"
 DEP_AUTOCONF_FILENAME="autoconf-${DEP_AUTOCONF_VERSION}.tar.gz"
+# automake
+DEP_AUTOMAKE_SOURCE_URL="http://ftp.gnu.org/gnu/automake/"
+DEP_AUTOMAKE_VERSION="1.15"
+DEP_AUTOMAKE_FILENAME="automake-${DEP_AUTOMAKE_VERSION}.tar.gz"
 # minizip
 DEP_MINIZIP_SOURCE_URL="http://zlib.net/"
 DEP_MINIZIP_VERSION="1.2.8"
@@ -36,6 +40,7 @@ function build_deps_build()
 {
 	log "Building dependencies. This could take awhile..."
     build_deps_autoconf
+    build_deps_automake
     build_deps_pkgconfig
 	build_deps_qconf
 	build_deps_minizip
@@ -92,6 +97,40 @@ function build_deps_autoconf()
     export AUTORECONF="${PSIBUILD_DEPS_DIR}/dep_root/bin/autoreconf"
     log "Detected autoconf: ${AUTOCONF}"
     log "Detected autoreconf: ${AUTORECONF}"
+}
+
+#####################################################################
+# Automake installation/detection
+#####################################################################
+function build_deps_automake()
+{
+    log "Detecting automake..."
+    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/bin/automake" ]; then
+        log "Downloading automake sources..."
+        mkdir -p "${PSIBUILD_DEPS_DIR}/automake"
+        cd "${PSIBUILD_DEPS_DIR}/automake"
+        curl -L "${DEP_AUTOMAKE_SOURCE_URL}/${DEP_AUTOMAKE_FILENAME}" -o "${DEP_AUTOMAKE_FILENAME}"
+        tar -xf "${DEP_AUTOMAKE_FILENAME}"
+        cd "automake-${DEP_AUTOMAKE_VERSION}"
+        log "Configuring automake..."
+        ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" >> "${PSIBUILD_LOGS_DIR}/automake-configure.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "automake configuration" "${PSI_DIR}/logs/automake-configure.log"
+        fi
+        log "Compiling automake..."
+        ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/automake-make.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "automake compilation" "${PSI_DIR}/logs/automake-make.log"
+        fi
+        log "Installing automake..."
+        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/automake-install.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "automake installation" "${PSI_DIR}/logs/automake-install.log"
+        fi
+    fi
+
+    export AUTOMAKE="${PSIBUILD_DEPS_DIR}/dep_root/bin/automake"
+    log "Detected automake: ${AUTOMAKE}"
 }
 
 #####################################################################
