@@ -300,6 +300,15 @@ function configure_env_prepare_dir_variables()
 }
 
 #####################################################################
+# This function will tune pkg-config paths.
+#####################################################################
+function configure_env_tune_pkgconfig()
+{
+    log "Forcing pkg-config to take a look into our dependencies root's pkg-config directory..."
+    export PKG_CONFIG_PATH="${PSIBUILD_DEPS_DIR}/dep_root/lib/pkgconfig:${PKG_CONFIG_PATH}"
+}
+
+#####################################################################
 # This function prepares environment for building Psi+ and
 # dependencies.
 #####################################################################
@@ -313,6 +322,7 @@ function configure_env_prepare_environment()
 	configure_env_prepare_dir_variables
 	configure_env_create_directories
 	configure_env_prepare_buildflags
+    configure_env_tune_pkgconfig
 }
 
 configure_env_detect_standalone
