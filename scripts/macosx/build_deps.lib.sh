@@ -10,6 +10,14 @@ DEP_AUTOMAKE_FILENAME="automake-${DEP_AUTOMAKE_VERSION}.tar.gz"
 DEP_CMAKE_SOURCE_URL="https://cmake.org/files/v3.5/"
 DEP_CMAKE_VERSION="3.5.2"
 DEP_CMAKE_FILENAME="cmake-${DEP_CMAKE_VERSION}.tar.gz"
+# Growl
+DEP_GROWL_SOURCE_URL="http://growl.cachefly.net/"
+DEP_GROWL_VERSION="1.3.1"
+DEP_GROWL_FILENAME="Growl-${DEP_GROWL_VERSION}-SDK.zip"
+# GStreamer
+DEP_GST_SOURCE_URL="http://psi-im.org/files/deps/"
+DEP_GST_VERSION="0.10.36"
+DEP_GST_FILENAME="gstbundle-${DEP_GST_VERSION}-mac.tar.bz2"
 # libtool
 DEP_LIBTOOL_SOURCE_URL="http://mirror.tochlab.net/pub/gnu/libtool/"
 DEP_LIBTOOL_VERSION="2.4.6"
@@ -22,24 +30,20 @@ DEP_MINIZIP_FILENAME="zlib-${DEP_MINIZIP_VERSION}.tar.gz"
 DEP_LIBIDN_SOURCE_URL="http://ftpmirror.gnu.org/libidn/"
 DEP_LIBIDN_VERSION="1.32"
 DEP_LIBIDN_FILENAME="libidn-${DEP_LIBIDN_VERSION}.tar.gz"
+# openssl
+DEP_OPENSSL_SOURCE_URL="https://www.openssl.org/source/"
+DEP_OPENSSL_VERSION="1.0.2h"
+DEP_OPENSSL_FILENAME="openssl-${DEP_OPENSSL_VERSION}.tar.gz"
 # pkg-config
 DEP_PKGCONFIG_SOURCE_URL="https://pkg-config.freedesktop.org/releases/"
 DEP_PKGCONFIG_VERSION="0.29.1"
 DEP_PKGCONFIG_FILENAME="pkg-config-${DEP_PKGCONFIG_VERSION}.tar.gz"
+# Psimedia
+DEP_PSIMEDIA_SOURCE_URL="https://github.com/psi-plus/psimedia.git"
 # Qt Cryptographic Architecture
 DEP_QCA_SOURCE_URL="http://delta.affinix.com/download/qca/2.0/"
 DEP_QCA_VERSION="2.1.0"
 DEP_QCA_FILENAME="qca-${DEP_QCA_VERSION}.tar.gz"
-# GStreamer
-DEP_GST_SOURCE_URL="http://psi-im.org/files/deps/"
-DEP_GST_VERSION="0.10.36"
-DEP_GST_FILENAME="gstbundle-${DEP_GST_VERSION}-mac.tar.bz2"
-# Growl
-DEP_GROWL_SOURCE_URL="http://growl.cachefly.net/"
-DEP_GROWL_VERSION="1.3.1"
-DEP_GROWL_FILENAME="Growl-${DEP_GROWL_VERSION}-SDK.zip"
-# Psimedia
-DEP_PSIMEDIA_SOURCE_URL="https://github.com/psi-plus/psimedia.git"
 
 #####################################################################
 # Main function for this file. It'll be called by psibuild.
@@ -55,6 +59,7 @@ function build_deps_build()
 	build_deps_minizip
     build_deps_default_way "libidn" "libidn.dylib" "library" "libidn-${DEP_LIBIDN_VERSION}" "--disable-dependency-tracking --disable-csharp"
     build_deps_cmake
+    build_deps_openssl
     build_deps_qca
     build_deps_gstreamer
     build_deps_psimedia
@@ -347,6 +352,64 @@ function build_deps_minizip()
 }
 
 #####################################################################
+# openssl installation/detection
+#####################################################################
+function build_deps_openssl()
+{
+    log "Detecting openssl..."
+    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/lib/libssl.dylib" ]; then
+        log "Downloading openssl sources..."
+        mkdir -p "${PSIBUILD_DEPS_DIR}/openssl"
+        cd "${PSIBUILD_DEPS_DIR}/openssl"
+        if [ ! -f "${PSIBUILD_DEPS_DIR}/openssl/${DEP_OPENSSL_FILENAME}" ]; then
+            curl -L "${DEP_OPENSSL_SOURCE_URL}/${DEP_OPENSSL_FILENAME}" -o "${DEP_OPENSSL_FILENAME}"
+        else
+            log "Sources already downloaded."
+            rm -rf "openssl-${DEP_OPENSSL_VERSION}"
+        fi
+
+        # Unpacking.
+        log "Unpacking sources..."
+        tar -xf "${DEP_OPENSSL_FILENAME}"
+        cd "openssl-${DEP_OPENSSL_VERSION}"
+
+        # Sed magic :).
+        log "Executing some sed magic..."
+        sed -i -e "s/.*zlib_dso\ \=\ DSO_load(NULL\,\ \"z\"\,.*/zlib_dso\ \= DSO_load(NULL\,\ \"\/usr\/lib\/libz\.dylib\"\,\ NULL\,\ DSO_FLAG_NO_NAME_TRANSLATION)\;/" crypto/comp/c_zlib.c
+
+        # Configuring.
+        log "Configuring openssl..."
+        perl ./Configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" no-ssl2 zlib-dynamic shared enable-cms darwin64-x86_64-cc enable-ec_nistp_64_gcc_128 >> "${PSIBUILD_LOGS_DIR}/openssl-configure.log" 2>&1
+
+        # Copy opensslconf.h into include dir.
+        #mkdir -p include/openssl
+        #cp MacOS/opensslconf.h include/openssl/
+
+        # Compilation.
+        # WARNING: openssl incapable to build with -j > 1, so forcing
+        # it.
+        log "Compiling openssl depends..."
+        ${MAKE} -j1 depend >> "${PSIBUILD_LOGS_DIR}/openssl-make.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "openssl depends compilation" "${PSI_DIR}/logs/openssl-make.log"
+        fi
+        log "Compiling openssl..."
+        ${MAKE} -j1 >> "${PSIBUILD_LOGS_DIR}/openssl-make.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "openssl compilation" "${PSI_DIR}/logs/openssl-make.log"
+        fi
+        # We are skipping tests for now.
+
+        # Installation
+        log "Installing openssl..."
+        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/openssl-install.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "openssl installation" "${PSI_DIR}/logs/openssl-install.log"
+        fi
+    fi
+}
+
+#####################################################################
 # psimedia installation/detection
 #####################################################################
 function build_deps_psimedia()
@@ -406,7 +469,7 @@ function build_deps_qca()
             rm -rf build
         fi
         mkdir build && cd $_
-        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${PSIBUILD_DEPS_DIR}/dep_root" -DQCA_PREFIX_INSTALL_DIR="${PSIBUILD_DEPS_DIR}/dep_root" -DQT_INSTALL_LIBS="${QTDIR}" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.5 -DQT4_BUILD=ON -DBUILD_TESTS=OFF -DUSE_RELATIVE_PATHS=ON -DQT_QMAKE_EXECUTABLE="${QTDIR}/bin/qmake" ..  >> "${PSIBUILD_LOGS_DIR}/qca-configure.log" 2>&1
+        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${PSIBUILD_DEPS_DIR}/dep_root" -DQCA_PREFIX_INSTALL_DIR="${PSIBUILD_DEPS_DIR}/dep_root" -DQT_INSTALL_LIBS="${QTDIR}" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.5 -DQT4_BUILD=ON -DBUILD_TESTS=OFF -DUSE_RELATIVE_PATHS=ON -DQT_QMAKE_EXECUTABLE="${QTDIR}/bin/qmake" -DBUILD_PLUGINS=auto ..  >> "${PSIBUILD_LOGS_DIR}/qca-configure.log" 2>&1
         if [ $? -ne 0 ]; then
             action_failed "qca configuration" "${PSI_DIR}/logs/qca-configure.log"
         fi
@@ -458,7 +521,7 @@ function build_deps_qconf()
         local qconf_conf_opts="--qtdir=${QTDIR}"
         ./configure ${qconf_conf_opts}
         if [ $? -ne 0 ]; then
-            action_failed "QConf sources configuration" "None"
+            action_failed "QConf sources configuration" ""
         fi
         ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/qconf-make.log" 2>&1
         if [ $? -ne 0 ]; then

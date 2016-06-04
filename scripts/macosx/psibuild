@@ -129,6 +129,10 @@ function action_failed()
         error "Last 10 lines from log:"
         cat "${log_path}" | tail -n 10
     fi
+    echo ""
+    if [ "${#log_path}" -gt 0 ]; then
+        echo "Full log located here: ${logpath}"
+    fi
     exit 1
 }
 

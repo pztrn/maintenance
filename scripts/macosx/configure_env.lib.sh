@@ -31,6 +31,16 @@ function configure_env_check_os()
     else
     	log "Launched on Darwin OS, presuming this is OS X."
     fi
+
+    # We are supporting x86_64 and our OS should be definetely > 10.7.
+    # Check it and, if differ, exit. We do not support building on < 10.7.
+    local osxver=`uname -r`
+    if [ ${osxver:0:2} -lt 13 ]; then
+        error "You are trying to build on unsupported version of OS X."
+        die "We are supporting only OS X 10.9+ (10.9.5 preferably)!"
+    else
+        log "Running on OS X 10.9+"
+    fi
 }
 
 #####################################################################
