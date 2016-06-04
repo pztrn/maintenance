@@ -223,15 +223,17 @@ EOF
 			sh ${PSI_DIR}/maintenance/scripts/macosx/otrdeps.sh ${OTRDEPS_DIR} ${PSI_DIR}/build/src/plugins/generic/${plugin} 2>/dev/null || die "make ${plugin} plugin failed"
         else
             # This is default plugin compilation sequence.
-            cd "${PSI_DIR}/build/src/plugins/generic/${plugin}"
-            log "Compiling ${plugin} plugin"
-            ${QMAKE} ${plugin}.pro >> "${PSI_DIR}/logs/plugins/${plugin}-qmake.log" 2>&1
-            if [ $? -ne 0 ]; then
-                action_failed "Configuring ${plugin}" "${PSI_DIR}/logs/plugins/${plugin}-qmake.log"
-            fi
-            ${MAKE} ${MAKEOPTS} >> "${PSI_DIR}/logs/plugins/${plugin}-make.log" 2>&1
-            if [ $? -ne 0 ]; then
-                action_failed "Building ${plugin}" "${PSI_DIR}/logs/plugins/${plugin}-make.log"
+            if [ -d "${PSI_DIR}/build/src/plugins/generic/${plugin}" ]; then
+                cd "${PSI_DIR}/build/src/plugins/generic/${plugin}"
+                log "Compiling ${plugin} plugin"
+                ${QMAKE} ${plugin}.pro >> "${PSI_DIR}/logs/plugins/${plugin}-qmake.log" 2>&1
+                if [ $? -ne 0 ]; then
+                    action_failed "Configuring ${plugin}" "${PSI_DIR}/logs/plugins/${plugin}-qmake.log"
+                fi
+                ${MAKE} ${MAKEOPTS} >> "${PSI_DIR}/logs/plugins/${plugin}-make.log" 2>&1
+                if [ $? -ne 0 ]; then
+                    action_failed "Building ${plugin}" "${PSI_DIR}/logs/plugins/${plugin}-make.log"
+                fi
             fi
         fi
     done
