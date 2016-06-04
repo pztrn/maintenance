@@ -1,3 +1,7 @@
+# pkg-config
+DEP_PKGCONFIG_SOURCE_URL="https://pkg-config.freedesktop.org/releases/"
+DEP_PKGCONFIG_VERSION="0.29.1"
+DEP_PKGCONFIG_FILENAME="pkg-config-${DEP_PKGCONFIG_VERSION}.tar.gz"
 # minizip
 DEP_MINIZIP_SOURCE_URL="http://zlib.net/"
 DEP_MINIZIP_VERSION="1.2.8"
@@ -27,6 +31,7 @@ DEP_PSIMEDIA_SOURCE_URL="https://github.com/psi-plus/psimedia.git"
 function build_deps_build()
 {
 	log "Building dependencies. This could take awhile..."
+    build_deps_pkgconfig
 	build_deps_qconf
 	build_deps_minizip
     build_deps_libidn
@@ -111,10 +116,19 @@ function build_deps_libidn()
         cd "libidn-${DEP_LIBIDN_VERSION}"
         log "Configuring libidn..."
         ./configure --disable-dependency-tracking --prefix="${PSIBUILD_DEPS_DIR}/dep_root" --disable-csharp >> "${PSIBUILD_LOGS_DIR}/libidn-configure.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "libidn configuration" "${PSI_DIR}/logs/libidn-configure.log"
+        fi
         log "Compiling libidn..."
         ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/libidn-make.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "libidn compilation" "${PSI_DIR}/logs/libidn-make.log"
+        fi
         log "Installing libidn..."
         ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/libidn-install.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "libidn installation" "${PSI_DIR}/logs/libidn-install.log"
+        fi
     else
         log "Found libidn library:"
         export LIBIDN_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/include"
@@ -139,8 +153,14 @@ function build_deps_minizip()
         cd "zlib-${DEP_MINIZIP_VERSION}"
         log "Configuring ZLib..."
         ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" >> "${PSIBUILD_LOGS_DIR}/zlib-configure.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "zlib configuration" "${PSI_DIR}/logs/zlib-configure.log"
+        fi
         log "Compiling ZLib..."
         ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/zlib-make.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "zlib compilation" "${PSI_DIR}/logs/zlib-make.log"
+        fi
         cd contrib/minizip
         # Sed magic from https://github.com/Homebrew/homebrew-core/blob/master/Formula/minizip.rb
         log "Executing sed magic..."
@@ -149,18 +169,67 @@ function build_deps_minizip()
         sed -i "" "s/libminizip.la\ \-lz/libminizip.la/" Makefile.am
         log "Configuring minizip..."
         autoreconf -fi  >> "${PSIBUILD_LOGS_DIR}/minizip-configure.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "minizip configuration" "${PSI_DIR}/logs/minizip-configure.log"
+        fi
         ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" >> "${PSIBUILD_LOGS_DIR}/minizip-configure.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "minizip configuration" "${PSI_DIR}/logs/minizip-configure.log"
+        fi
         log "Compiling minizip..."
         ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/minizip-make.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "minizip compilation" "${PSI_DIR}/logs/minizip-make.log"
+        fi
         log "Installing minizip..."
         ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/minizip-install.log" 2>&1
-	else
-		log "Found minizip library:"
-        export MINIZIP_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/include"
-        export MINIZIP_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/libminizip.dylib"
-        log "Include path: '${MINIZIP_INCLUDE}'"
-        log "Library path: '${MINIZIP_LIBRARY}'"
+        if [ $? -ne 0 ]; then
+            action_failed "minizip installation" "${PSI_DIR}/logs/minizip-install.log"
+        fi
 	fi
+
+    log "Found minizip library:"
+    export MINIZIP_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/include"
+    export MINIZIP_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/libminizip.dylib"
+    log "Include path: '${MINIZIP_INCLUDE}'"
+    log "Library path: '${MINIZIP_LIBRARY}'"
+}
+
+#####################################################################
+# pkg-config installation/detection
+#####################################################################
+function build_deps_pkgconfig()
+{
+    log "Detecting pkgconfig..."
+    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/bin/pkgconfig" ]; then
+        log "Installing pkg-config..."
+        if [ ! -d "${PSIBUILD_DEPS_DIR}/pkg-config" ]; then
+            mkdir -p "${PSIBUILD_DEPS_DIR}/pkg-config"
+        fi
+        log "Downloading pkg-config sources..."
+        cd "${PSIBUILD_DEPS_DIR}/pkg-config"
+        curl -L "${DEP_PKGCONFIG_SOURCE_URL}/${DEP_PKGCONFIG_FILENAME}" -o "${DEP_PKGCONFIG_FILENAME}"
+        tar -xf "${DEP_PKGCONFIG_FILENAME}"
+        cd "pkg-config-${DEP_PKGCONFIG_VERSION}"
+        log "Configuring pkg-config..."
+        ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" >> "${PSIBUILD_LOGS_DIR}/pkg-config-configure.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "pkg-config configuration" "${PSI_DIR}/logs/pkg-config-configure.log"
+        fi
+        log "Compiling pkg-config..."
+        ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/pkg-config-make.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "pkg-config compilation" "${PSI_DIR}/logs/pkg-config-make.log"
+        fi
+        log "Installing pkg-config..."
+        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/pkg-config-install.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "pkg-config installation" "${PSI_DIR}/logs/pkg-config-install.log"
+        fi
+    fi
+
+    PKGCONFIG="${PSIBUILD_DEPS_DIR}/dep_root/bin/pkg-config"
+    log "Detected pkgconfig binary: ${PKGCONFIG}"
 }
 
 #####################################################################
@@ -204,17 +273,26 @@ function build_deps_qca()
         log "Configuring QCA..."
         mkdir build && cd $_
         cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${PSIBUILD_DEPS_DIR}/dep_root" -DQCA_PREFIX_INSTALL_DIR="${PSIBUILD_DEPS_DIR}/dep_root" -DQT_INSTALL_LIBS="${QTDIR}" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.5 -DQT4_BUILD=ON -DBUILD_TESTS=OFF -DUSE_RELATIVE_PATHS=ON -DQT_QMAKE_EXECUTABLE="${QTDIR}/bin/qmake" ..  >> "${PSIBUILD_LOGS_DIR}/qca-configure.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "qca configuration" "${PSI_DIR}/logs/qca-configure.log"
+        fi
         log "Compiling QCA..."
         ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/qca-make.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "qca compilation" "${PSI_DIR}/logs/qca-make.log"
+        fi
         log "Installing QCA..."
         ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/qca-install.log" 2>&1
-    else
-        log "Found minizip library:"
-        export QCA_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/lib/qca.framework/Versions/Current/Headers"
-        export QCA_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/qca.framework/Versions/Current/qca"
-        log "Include path: '${QCA_INCLUDE}'"
-        log "Library path: '${QCA_LIBRARY}'"
+        if [ $? -ne 0 ]; then
+            action_failed "qca installation" "${PSI_DIR}/logs/qca-install.log"
+        fi
     fi
+
+    log "Found minizip library:"
+    export QCA_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/lib/qca.framework/Versions/Current/Headers"
+    export QCA_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/qca.framework/Versions/Current/qca"
+    log "Include path: '${QCA_INCLUDE}'"
+    log "Library path: '${QCA_LIBRARY}'"
 }
 
 #####################################################################
