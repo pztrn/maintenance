@@ -306,6 +306,7 @@ function configure_env_tune_pkgconfig()
 {
     log "Forcing pkg-config to take a look into our dependencies root's pkg-config directory..."
     export PKG_CONFIG_PATH="${PSIBUILD_DEPS_DIR}/dep_root/lib/pkgconfig:${PKG_CONFIG_PATH}"
+    log "PKG_CONFIG_PATH is now: ${PKG_CONFIG_PATH}"
 }
 
 #####################################################################
