@@ -301,6 +301,9 @@ function copy_libraries()
         cp -a "${lib}" "${PSIAPP_DIR}/Frameworks"
     done
 
+    # Copy QCA plugins
+    cp -R "${PSIBUILD_DEPS_DIR}/dep_root/lib/qca/crypto/*.dylib" "${PSIAPP_DIR}/Frameworks"
+
     # Go thru all bundled libraries, and check for dependencies.
     # If something is outside of bundle - install it.
     log "Bundling Qt library dependencies..."
