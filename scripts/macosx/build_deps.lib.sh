@@ -1,7 +1,3 @@
-# pkg-config
-DEP_PKGCONFIG_SOURCE_URL="https://pkg-config.freedesktop.org/releases/"
-DEP_PKGCONFIG_VERSION="0.29.1"
-DEP_PKGCONFIG_FILENAME="pkg-config-${DEP_PKGCONFIG_VERSION}.tar.gz"
 # autoconf
 DEP_AUTOCONF_SOURCE_URL="http://ftp.gnu.org/gnu/autoconf/"
 DEP_AUTOCONF_VERSION="2.69"
@@ -10,6 +6,10 @@ DEP_AUTOCONF_FILENAME="autoconf-${DEP_AUTOCONF_VERSION}.tar.gz"
 DEP_AUTOMAKE_SOURCE_URL="http://ftp.gnu.org/gnu/automake/"
 DEP_AUTOMAKE_VERSION="1.15"
 DEP_AUTOMAKE_FILENAME="automake-${DEP_AUTOMAKE_VERSION}.tar.gz"
+# cmake
+DEP_CMAKE_SOURCE_URL="https://cmake.org/files/v3.5/"
+DEP_CMAKE_VERSION="3.5.2"
+DEP_CMAKE_FILENAME="cmake-${DEP_CMAKE_VERSION}.tar.gz"
 # libtool
 DEP_LIBTOOL_SOURCE_URL="http://mirror.tochlab.net/pub/gnu/libtool/"
 DEP_LIBTOOL_VERSION="2.4.6"
@@ -22,6 +22,10 @@ DEP_MINIZIP_FILENAME="zlib-${DEP_MINIZIP_VERSION}.tar.gz"
 DEP_LIBIDN_SOURCE_URL="http://ftpmirror.gnu.org/libidn/"
 DEP_LIBIDN_VERSION="1.32"
 DEP_LIBIDN_FILENAME="libidn-${DEP_LIBIDN_VERSION}.tar.gz"
+# pkg-config
+DEP_PKGCONFIG_SOURCE_URL="https://pkg-config.freedesktop.org/releases/"
+DEP_PKGCONFIG_VERSION="0.29.1"
+DEP_PKGCONFIG_FILENAME="pkg-config-${DEP_PKGCONFIG_VERSION}.tar.gz"
 # Qt Cryptographic Architecture
 DEP_QCA_SOURCE_URL="http://delta.affinix.com/download/qca/2.0/"
 DEP_QCA_VERSION="2.1.0"
@@ -50,10 +54,54 @@ function build_deps_build()
 	build_deps_qconf
 	build_deps_minizip
     build_deps_default_way "libidn" "libidn.dylib" "library" "libidn-${DEP_LIBIDN_VERSION}" "--disable-dependency-tracking --disable-csharp"
+    build_deps_cmake
     build_deps_qca
     build_deps_gstreamer
     build_deps_psimedia
     build_deps_growl
+}
+
+#####################################################################
+# Cmake installation/detection
+#####################################################################
+function build_deps_cmake()
+{
+    log "Detecting cmake..."
+    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/bin/cmake" ]; then
+        log "Downloading cmake sources..."
+        mkdir -p "${PSIBUILD_DEPS_DIR}/cmake"
+        cd "${PSIBUILD_DEPS_DIR}/cmake"
+        if [ ! -f "${PSIBUILD_DEPS_DIR}/cmake/${DEP_CMAKE_FILENAME}" ]; then
+            curl -L "${DEP_CMAKE_SOURCE_URL}/${DEP_CMAKE_FILENAME}" -o "${DEP_CMAKE_FILENAME}"
+        else
+            log "Sources already downloaded."
+            rm -rf "cmake-${DEP_CMAKE_VERSION}"
+        fi
+        log "Unpacking sources..."
+        tar -xf "${DEP_CMAKE_FILENAME}"
+        cd "cmake-${DEP_CMAKE_VERSION}"
+
+        # Configuration.
+        log "Configuring cmake..."
+        ./bootstrap --prefix="${PSIBUILD_DEPS_DIR}/dep_root" --no-system-libs --system-zlib --system-bzip2 --no-qt-gui --datadir=/share/cmake --docdir=/share/doc/cmake --mandir=/share/man  >> "${PSIBUILD_LOGS_DIR}/cmake-configure.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "cmake configuration" "${PSI_DIR}/logs/cmake-configure.log"
+        fi
+
+        # Compilation.
+        log "Compiling cmake..."
+        ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/cmake-make.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "cmake compilation" "${PSI_DIR}/logs/cmake-make.log"
+        fi
+
+        # Installation.
+        log "Installing cmake..."
+        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/cmake-install.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "cmake installation" "${PSI_DIR}/logs/cmake-install.log"
+        fi
+    fi
 }
 
 #####################################################################
@@ -118,9 +166,15 @@ function build_deps_default_way()
         local source_version="DEP_${bts_uppercase}_VERSION"
         URL="${!source_url}/${!source_filename}"
         log "URL: ${URL}"
-        curl -L "${URL}" -o "${!source_filename}"
+        if [ ! -f "${PSIBUILD_DEPS_DIR}/${dep}/${!source_filename}" ]; then
+            curl -L "${URL}" -o "${!source_filename}"
+        else
+            log "Sources already downloaded."
+            rm -rf "${source_dir_name}"
+        fi
 
         # Extracting sources...
+        log "Unpacking sources..."
         tar -xf "${!source_filename}"
         cd "${source_dir_name}"
 
@@ -158,7 +212,13 @@ function build_deps_gstreamer()
         log "Downloading GStreamer source..."
         mkdir -p "${PSIBUILD_DEPS_DIR}/gstreamer"
         cd "${PSIBUILD_DEPS_DIR}/gstreamer"
-        curl -L "${DEP_GST_SOURCE_URL}/${DEP_GST_FILENAME}" -o "${DEP_GST_FILENAME}"
+        if [ ! -f "${PSIBUILD_DEPS_DIR}/gstreamer/${DEP_GST_FILENAME}" ]; then
+            curl -L "${DEP_GST_SOURCE_URL}/${DEP_GST_FILENAME}" -o "${DEP_GST_FILENAME}"
+        else
+            log "Sources already downloaded."
+            rm -rf "gstbundle-${DEP_GST_VERSION}-mac"
+        fi
+        log "Unpacking sources..."
         tar -xf "${DEP_GST_FILENAME}"
         cd "gstbundle-${DEP_GST_VERSION}-mac"
         log "Copying GStreamer to dep_root..."
@@ -182,7 +242,13 @@ function build_deps_growl()
         log "Downloading Growl source..."
         mkdir -p "${PSIBUILD_DEPS_DIR}/growl"
         cd "${PSIBUILD_DEPS_DIR}/growl"
-        curl -L "${DEP_GROWL_SOURCE_URL}/${DEP_GROWL_FILENAME}" -o "${DEP_GROWL_FILENAME}"
+        if [ ! -f "${PSIBUILD_DEPS_DIR}/growl/${DEP_GROWL_FILENAME}" ]; then
+            curl -L "${DEP_GROWL_SOURCE_URL}/${DEP_GROWL_FILENAME}" -o "${DEP_GROWL_FILENAME}"
+        else
+            log "Sources already downloaded."
+            rm -rf "Growl-${DEP_GROWL_VERSION}-SDK"
+        fi
+        log "Unpacking sources..."
         tar -xf "${DEP_GROWL_FILENAME}"
         cd "Growl-${DEP_GROWL_VERSION}-SDK"
         log "Copying framework into '${PSIBUILD_DEPS_DIR}/dep_root/lib'..."
@@ -206,7 +272,13 @@ function build_deps_minizip()
 		log "Downloading minizip (zlib) sources..."
 		mkdir -p "${PSIBUILD_DEPS_DIR}/zlib"
 		cd "${PSIBUILD_DEPS_DIR}/zlib"
-		curl -L "${DEP_MINIZIP_SOURCE_URL}/${DEP_MINIZIP_FILENAME}" -o "${DEP_MINIZIP_FILENAME}"
+        if [ ! -f "${PSIBUILD_DEPS_DIR}/zlib/${DEP_MINIZIP_FILENAME}" ]; then
+		    curl -L "${DEP_MINIZIP_SOURCE_URL}/${DEP_MINIZIP_FILENAME}" -o "${DEP_MINIZIP_FILENAME}"
+        else
+            log "Sources already downloaded."
+            rm -rf "zlib-${DEP_MINIZIP_VERSION}"
+        fi
+        log "Unpacking sources..."
 		tar -xf "${DEP_MINIZIP_FILENAME}"
         cd "zlib-${DEP_MINIZIP_VERSION}"
         log "Configuring ZLib..."
@@ -261,9 +333,19 @@ function build_deps_psimedia()
     log "Detecting psimedia..."
     if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/lib/libpsimedia.dylib" ]; then
         log "Downloading Psimedia sources..."
-        mkdir -p "${PSIBUILD_DEPS_DIR}/psimedia"
+        if [ ! -d "${PSIBUILD_DEPS_DIR}/psimedia/.git" ]; then
+            log "Git repository not found, cloning..."
+            rm -rf "${PSIBUILD_DEPS_DIR}/psimedia/"
+            cd "${PSIBUILD_DEPS_DIR}/psimedia"
+            git clone "${DEP_PSIMEDIA_SOURCE_URL}" .
+        else
+            log "Updating already present git repository..."
+            cd "${PSIBUILD_DEPS_DIR}/psimedia"
+            git pull
+        fi
+
         cd "${PSIBUILD_DEPS_DIR}/psimedia"
-        git clone "${DEP_PSIMEDIA_SOURCE_URL}" .
+
         log "Configuring Psimedia..."
         #QTDIR="${QTDIR}" ${QCONF} >> "${PSIBUILD_LOGS_DIR}/psimedia-qconf.log" 2>&1
         #PKG_CONFIG_PATH=~/psi/dependencies/dep_root/lib/pkgconfig ./configure --qtdir="${QTDIR}"
@@ -288,7 +370,13 @@ function build_deps_qca()
         log "Downloading QCA sources..."
         mkdir -p "${PSIBUILD_DEPS_DIR}/qca"
         cd "${PSIBUILD_DEPS_DIR}/qca"
-        curl -L "${DEP_QCA_SOURCE_URL}/${DEP_QCA_FILENAME}" -o "${DEP_QCA_FILENAME}"
+        if [ ! -f "${PSIBUILD_DEPS_DIR}/qca/${DEP_QCA_FILENAME}" ]; then
+            curl -L "${DEP_QCA_SOURCE_URL}/${DEP_QCA_FILENAME}" -o "${DEP_QCA_FILENAME}"
+        else
+            log "Sources already downloaded."
+            rm -rf "qca-${DEP_QCA_VERSION}"
+        fi
+        log "Unpacking sources..."
         tar -xf "${DEP_QCA_FILENAME}"
         cd "qca-${DEP_QCA_VERSION}"
         log "Configuring QCA..."
