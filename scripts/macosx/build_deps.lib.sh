@@ -10,6 +10,10 @@ DEP_AUTOCONF_FILENAME="autoconf-${DEP_AUTOCONF_VERSION}.tar.gz"
 DEP_AUTOMAKE_SOURCE_URL="http://ftp.gnu.org/gnu/automake/"
 DEP_AUTOMAKE_VERSION="1.15"
 DEP_AUTOMAKE_FILENAME="automake-${DEP_AUTOMAKE_VERSION}.tar.gz"
+# libtool
+DEP_LIBTOOL_SOURCE_URL="http://mirror.tochlab.net/pub/gnu/libtool/"
+DEP_LIBTOOL_VERSION="2.4.6"
+DEP_LIBTOOL_FILENAME="libtool-${DEP_LIBTOOL_VERSION}.tar.gz"
 # minizip
 DEP_MINIZIP_SOURCE_URL="http://zlib.net/"
 DEP_MINIZIP_VERSION="1.2.8"
@@ -39,12 +43,13 @@ DEP_PSIMEDIA_SOURCE_URL="https://github.com/psi-plus/psimedia.git"
 function build_deps_build()
 {
 	log "Building dependencies. This could take awhile..."
-    build_deps_autoconf
-    build_deps_automake
-    build_deps_pkgconfig
+    build_deps_default_way "autoconf" "autoconf" "bin" "autoconf-${DEP_AUTOCONF_VERSION}" ""
+    build_deps_default_way "automake" "automake" "bin" "automake-${DEP_AUTOMAKE_VERSION}" ""
+    build_deps_default_way "pkgconfig" "pkg-config" "bin" "pkg-config-${DEP_PKGCONFIG_VERSION}" "--with-internal-glib"
+    build_deps_default_way "libtool" "libtoolize" "bin" "libtool-${DEP_LIBTOOL_VERSION}" "--disable-dependency-tracking --enable-ltdl-install"
 	build_deps_qconf
 	build_deps_minizip
-    build_deps_libidn
+    build_deps_default_way "libidn" "libidn.dylib" "library" "libidn-${DEP_LIBIDN_VERSION}" "--disable-dependency-tracking --disable-csharp"
     build_deps_qca
     build_deps_gstreamer
     build_deps_psimedia
@@ -64,73 +69,83 @@ function build_deps_detect_standalone()
 }
 
 #####################################################################
-# Autoconf installation/detection
+# Default way to build dependencies, e.g. ./configure && make && make install.
+# All non-default things should be hardcoded.
+#
+# Params accepted:
+#   $1 - dependency name
+#   $2 - binary to search. Used for detecting if dependency was properly
+#        installed.
+#   $3 - dependency type. Supports "bin" and "library" for now.
+#   $4 - directory name from tarball.
+#   $5 - additional configure options to pass.
+#
+# Note to man who can probably patch this function: do not add
+# anything AFTER $additional_configure_opts! Add before!
+# And don't forget about one more shift AND fixing build_deps_build()
+# calls!
 #####################################################################
-function build_deps_autoconf()
+function build_deps_default_way()
 {
-    log "Detecting autoconf..."
-    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/bin/autoconf" ]; then
-        log "Downloading autoconf sources..."
-        mkdir -p "${PSIBUILD_DEPS_DIR}/autoconf"
-        cd "${PSIBUILD_DEPS_DIR}/autoconf"
-        curl -L "${DEP_AUTOCONF_SOURCE_URL}/${DEP_AUTOCONF_FILENAME}" -o "${DEP_AUTOCONF_FILENAME}"
-        tar -xf "${DEP_AUTOCONF_FILENAME}"
-        cd "autoconf-${DEP_AUTOCONF_VERSION}"
-        log "Configuring autoconf..."
-        ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" >> "${PSIBUILD_LOGS_DIR}/autoconf-configure.log" 2>&1
-        if [ $? -ne 0 ]; then
-            action_failed "autoconf configuration" "${PSI_DIR}/logs/autoconf-configure.log"
-        fi
-        log "Compiling autoconf..."
-        ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/autoconf-make.log" 2>&1
-        if [ $? -ne 0 ]; then
-            action_failed "autoconf compilation" "${PSI_DIR}/logs/autoconf-make.log"
-        fi
-        log "Installing autoconf..."
-        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/autoconf-install.log" 2>&1
-        if [ $? -ne 0 ]; then
-            action_failed "autoconf installation" "${PSI_DIR}/logs/autoconf-install.log"
-        fi
+    local dep=$1
+    local binary_to_search=$2
+    local detection_type=$3
+    local source_dir_name=$4
+    shift
+    shift
+    shift
+    shift
+    local additional_configure_opts=$@
+    log "Detecting ${dep}..."
+
+    if [ "${detection_type}" == "bin" ]; then
+        local bin_path="${PSIBUILD_DEPS_DIR}/dep_root/bin/${binary_to_search}"
+    elif [ "${detection_type}" == "library" ]; then
+        local bin_path="${PSIBUILD_DEPS_DIR}/dep_root/lib/${binary_to_search}"
+    else
+        die "Unsupported detection type: ${detection_type}"
     fi
 
-    export AUTOCONF="${PSIBUILD_DEPS_DIR}/dep_root/bin/autoconf"
-    export AUTORECONF="${PSIBUILD_DEPS_DIR}/dep_root/bin/autoreconf"
-    log "Detected autoconf: ${AUTOCONF}"
-    log "Detected autoreconf: ${AUTORECONF}"
-}
+    if [ ! -f "${bin_path}" ]; then
+        log "Downloading ${dep} sources..."
+        mkdir -p "${PSIBUILD_DEPS_DIR}/${dep}"
+        cd "${PSIBUILD_DEPS_DIR}/${dep}"
 
-#####################################################################
-# Automake installation/detection
-#####################################################################
-function build_deps_automake()
-{
-    log "Detecting automake..."
-    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/bin/automake" ]; then
-        log "Downloading automake sources..."
-        mkdir -p "${PSIBUILD_DEPS_DIR}/automake"
-        cd "${PSIBUILD_DEPS_DIR}/automake"
-        curl -L "${DEP_AUTOMAKE_SOURCE_URL}/${DEP_AUTOMAKE_FILENAME}" -o "${DEP_AUTOMAKE_FILENAME}"
-        tar -xf "${DEP_AUTOMAKE_FILENAME}"
-        cd "automake-${DEP_AUTOMAKE_VERSION}"
-        log "Configuring automake..."
-        ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" >> "${PSIBUILD_LOGS_DIR}/automake-configure.log" 2>&1
+        # For downloading things from web we should obtain path to sources.
+        local bts_uppercase=`echo ${dep} | awk {' print toupper($0) '}`
+        local source_url="DEP_${bts_uppercase}_SOURCE_URL"
+        local source_filename="DEP_${bts_uppercase}_FILENAME"
+        local source_version="DEP_${bts_uppercase}_VERSION"
+        URL="${!source_url}/${!source_filename}"
+        log "URL: ${URL}"
+        curl -L "${URL}" -o "${!source_filename}"
+
+        # Extracting sources...
+        tar -xf "${!source_filename}"
+        cd "${source_dir_name}"
+
+        # Configuring sources...
+        log "Configuring ${dep}..."
+        log "Passed additional configuration options: ${additional_configure_opts}"
+        ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" ${additional_configure_opts} >> "${PSIBUILD_LOGS_DIR}/${dep}-configure.log" 2>&1
         if [ $? -ne 0 ]; then
-            action_failed "automake configuration" "${PSI_DIR}/logs/automake-configure.log"
+            action_failed "${dep} configuration" "${PSI_DIR}/logs/${dep}-configure.log"
         fi
-        log "Compiling automake..."
-        ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/automake-make.log" 2>&1
+
+        # Compilation.
+        log "Compiling ${dep}..."
+        ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/${dep}-make.log" 2>&1
         if [ $? -ne 0 ]; then
-            action_failed "automake compilation" "${PSI_DIR}/logs/automake-make.log"
+            action_failed "${dep} compilation" "${PSI_DIR}/logs/${dep}-make.log"
         fi
-        log "Installing automake..."
-        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/automake-install.log" 2>&1
+
+        # Installation.
+        log "Installing ${dep}..."
+        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/${dep}-install.log" 2>&1
         if [ $? -ne 0 ]; then
-            action_failed "automake installation" "${PSI_DIR}/logs/automake-install.log"
+            action_failed "${dep} installation" "${PSI_DIR}/logs/${dep}-install.log"
         fi
     fi
-
-    export AUTOMAKE="${PSIBUILD_DEPS_DIR}/dep_root/bin/automake"
-    log "Detected automake: ${AUTOMAKE}"
 }
 
 #####################################################################
@@ -179,43 +194,6 @@ function build_deps_growl()
     export GROWL_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/Growl.framework/Versions/A/Growl"
     log "Include path: '${GROWL_INCLUDE}'"
     log "Library path: '${GROWL_LIBRARY}'"
-}
-
-#####################################################################
-# libidn installation/detection
-#####################################################################
-function build_deps_libidn()
-{
-    log "Detecting libidn..."
-    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/lib/libidn.dylib" ]; then
-        log "Downloading libidn source..."
-        mkdir -p "${PSIBUILD_DEPS_DIR}/libidn"
-        cd "${PSIBUILD_DEPS_DIR}/libidn"
-        curl -L "${DEP_LIBIDN_SOURCE_URL}/${DEP_LIBIDN_FILENAME}" -o "${DEP_LIBIDN_FILENAME}"
-        tar -xf "${DEP_LIBIDN_FILENAME}"
-        cd "libidn-${DEP_LIBIDN_VERSION}"
-        log "Configuring libidn..."
-        ./configure --disable-dependency-tracking --prefix="${PSIBUILD_DEPS_DIR}/dep_root" --disable-csharp >> "${PSIBUILD_LOGS_DIR}/libidn-configure.log" 2>&1
-        if [ $? -ne 0 ]; then
-            action_failed "libidn configuration" "${PSI_DIR}/logs/libidn-configure.log"
-        fi
-        log "Compiling libidn..."
-        ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/libidn-make.log" 2>&1
-        if [ $? -ne 0 ]; then
-            action_failed "libidn compilation" "${PSI_DIR}/logs/libidn-make.log"
-        fi
-        log "Installing libidn..."
-        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/libidn-install.log" 2>&1
-        if [ $? -ne 0 ]; then
-            action_failed "libidn installation" "${PSI_DIR}/logs/libidn-install.log"
-        fi
-    fi
-
-    log "Found libidn library:"
-    export LIBIDN_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/include"
-    export LIBIDN_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/libidn.dylib"
-    log "Include path: '${LIBIDN_INCLUDE}'"
-    log "Library path: '${LIBIDN_LIBRARY}'"
 }
 
 #####################################################################
@@ -276,45 +254,6 @@ function build_deps_minizip()
 }
 
 #####################################################################
-# pkg-config installation/detection
-#####################################################################
-function build_deps_pkgconfig()
-{
-    log "Detecting pkgconfig..."
-    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/bin/pkg-config" ]; then
-        log "Installing pkg-config..."
-        if [ ! -d "${PSIBUILD_DEPS_DIR}/pkg-config" ]; then
-            mkdir -p "${PSIBUILD_DEPS_DIR}/pkg-config"
-        fi
-        log "Downloading pkg-config sources..."
-        cd "${PSIBUILD_DEPS_DIR}/pkg-config"
-        curl -L "${DEP_PKGCONFIG_SOURCE_URL}/${DEP_PKGCONFIG_FILENAME}" -o "${DEP_PKGCONFIG_FILENAME}"
-        tar -xf "${DEP_PKGCONFIG_FILENAME}"
-        cd "pkg-config-${DEP_PKGCONFIG_VERSION}"
-        log "Configuring pkg-config..."
-        ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" --with-internal-glib >> "${PSIBUILD_LOGS_DIR}/pkg-config-configure.log" 2>&1
-        if [ $? -ne 0 ]; then
-            action_failed "pkg-config configuration" "${PSI_DIR}/logs/pkg-config-configure.log"
-        fi
-        log "Compiling pkg-config..."
-        ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/pkg-config-make.log" 2>&1
-        if [ $? -ne 0 ]; then
-            action_failed "pkg-config compilation" "${PSI_DIR}/logs/pkg-config-make.log"
-        fi
-        log "Installing pkg-config..."
-        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/pkg-config-install.log" 2>&1
-        if [ $? -ne 0 ]; then
-            action_failed "pkg-config installation" "${PSI_DIR}/logs/pkg-config-install.log"
-        fi
-    fi
-
-    PKGCONFIG="${PSIBUILD_DEPS_DIR}/dep_root/bin/pkg-config"
-    log "Detected pkgconfig binary: ${PKGCONFIG}"
-    log "Adding '${PSIBUILD_DEPS_DIR}/dep_root/bin' into PATH..."
-    export PATH="${PSIBUILD_DEPS_DIR}/dep_root/bin:${PATH}"
-}
-
-#####################################################################
 # psimedia installation/detection
 #####################################################################
 function build_deps_psimedia()
@@ -370,7 +309,7 @@ function build_deps_qca()
         fi
     fi
 
-    log "Found minizip library:"
+    log "Found qca library:"
     export QCA_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/lib/qca.framework/Versions/Current/Headers"
     export QCA_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/qca.framework/Versions/Current/qca"
     log "Include path: '${QCA_INCLUDE}'"

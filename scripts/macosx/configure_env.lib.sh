@@ -300,6 +300,15 @@ function configure_env_prepare_dir_variables()
 }
 
 #####################################################################
+# This function will tune PATH variable.
+#####################################################################
+configure_env_tune_path()
+{
+    log "Adding '${PSIBUILD_DEPS_DIR}/dep_root/bin' to PATH..."
+    export PATH="${PSIBUILD_DEPS_DIR}/dep_root/bin:${PATH}"
+}
+
+#####################################################################
 # This function will tune pkg-config paths.
 #####################################################################
 function configure_env_tune_pkgconfig()
@@ -341,6 +350,7 @@ function configure_env_prepare_environment()
 	configure_env_prepare_dir_variables
 	configure_env_create_directories
 	configure_env_prepare_buildflags
+    configure_env_tune_path
     configure_env_tune_pkgconfig
 }
 
