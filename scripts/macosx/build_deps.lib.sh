@@ -201,7 +201,7 @@ function build_deps_minizip()
 function build_deps_pkgconfig()
 {
     log "Detecting pkgconfig..."
-    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/bin/pkgconfig" ]; then
+    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/bin/pkg-config" ]; then
         log "Installing pkg-config..."
         if [ ! -d "${PSIBUILD_DEPS_DIR}/pkg-config" ]; then
             mkdir -p "${PSIBUILD_DEPS_DIR}/pkg-config"
@@ -212,7 +212,7 @@ function build_deps_pkgconfig()
         tar -xf "${DEP_PKGCONFIG_FILENAME}"
         cd "pkg-config-${DEP_PKGCONFIG_VERSION}"
         log "Configuring pkg-config..."
-        ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" >> "${PSIBUILD_LOGS_DIR}/pkg-config-configure.log" 2>&1
+        ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" --with-internal-glib >> "${PSIBUILD_LOGS_DIR}/pkg-config-configure.log" 2>&1
         if [ $? -ne 0 ]; then
             action_failed "pkg-config configuration" "${PSI_DIR}/logs/pkg-config-configure.log"
         fi
@@ -230,6 +230,8 @@ function build_deps_pkgconfig()
 
     PKGCONFIG="${PSIBUILD_DEPS_DIR}/dep_root/bin/pkg-config"
     log "Detected pkgconfig binary: ${PKGCONFIG}"
+    log "Adding '${PSIBUILD_DEPS_DIR}/dep_root/bin' into PATH..."
+    export PATH="${PSIBUILD_DEPS_DIR}/dep_root/bin:${PATH}"
 }
 
 #####################################################################
