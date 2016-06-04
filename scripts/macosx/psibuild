@@ -20,8 +20,6 @@
 
 # Root directory for sources and build process.
 PSI_DIR="${HOME}/psi"
-# Directory for dependencies.
-DEPS_DIR="${PSI_DIR}/deps"
 
 # Iconsets that will be installed into bundle.
 ICONSETS="system clients activities moods affiliations roster"
@@ -33,7 +31,7 @@ TRANSLATIONS_TO_INSTALL="en"
 # Configure options.
 # These options will be passed to ./configure script.
 # Do not change them until you know what are you doing!
-CONF_OPTS="--disable-qdbus --enable-plugins --enable-whiteboarding --disable-xss --verbose"
+CONF_OPTS="--disable-qdbus --enable-whiteboarding --disable-xss --verbose"
 
 # Psi version.
 PSI_VERSION="0.16"
@@ -85,7 +83,7 @@ GIT_REPO_MAINTENANCE=git://github.com/psi-plus/maintenance.git
 GIT_REPO_RESOURCES=git://github.com/psi-plus/resources.git
 GIT_REPO_LANGS=git://github.com/psi-plus/psi-plus-l10n.git
 
-# Dependencies
+# Old dependencies
 GIT_REPO_PSIDEPS=git://github.com/psi-im/psideps.git
 GIT_REPO_DEP_QCONF=git://github.com/psi-plus/qconf.git
 GIT_REPO_DEP_QCA_QT5=git://anongit.kde.org/qca.git
@@ -98,6 +96,10 @@ MAKEOPTS=${MAKEOPT:--j$((`sysctl -n hw.ncpu`+1)) -s}
 # Skip generic patches. Useful when we're building from snapshot
 # sources.
 SKIP_GENERIC_PATCHES=0
+
+# Path where psibuild script is located. Used when importing other
+# parts (like build_deps.lib.sh).
+PSIBUILD_SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 #####################################################################
 #
@@ -192,171 +194,6 @@ function bundle_library()
 }
 
 #####################################################################
-# This function checks that environment are good for building Psi+.
-# It'll check some environment variables (like QTDIR), as well as
-# presence of required utilities.
-#####################################################################
-function check_environment()
-{
-    # Just a checking of OS where we launched this script. We shouldn't
-    # allow anyone to runit anywhere besides OS X, isn't it?
-    if [ `uname` != "Darwin" ]; then
-        error "This script intended to be launched only on OS X!"
-        die "Do you want your data to be vanished?"
-    fi
-    # Some Qt4/Qt5 local vars.
-    local qt4_found=0
-    local qt4_path=""
-    local qt4_version=""
-    local qt5_found=0
-    local qt5_path=""
-    local qt5_version=""
-    log "Checking environment..."
-    # We should not even try to build as root. At all.
-    if [ `whoami` == "root" ]; then
-        die "Psi+ should not be built as root. Restart build process \
-as normal user!"
-    fi
-    # Checking Qt presence and it's version.
-    # If QTDIR environment variable wasn't defined - we will try to
-    # autodetect installed Qt version.
-    if [ ! -z "${QTDIR}" ]; then
-        # QTDIR defined - skipping autodetection.
-        log "Qt path passed: ${QTDIR}"
-        local qt_v=`echo ${QTDIR} | awk -F"/" {' print $(NF) '}`
-        if [ ${#qt_v} -eq 0 ]; then
-            local qt_v=`echo ${QTDIR} | awk -F"/" {' print $(NF-1) '}`
-        fi
-        use_qt "${qt_v}" "${QTDIR}"
-    else
-        # Try to autodetect installed versions. We should detect one version
-        # for Qt4 and one version for Qt5.
-        # We are wanting self-compiled version of Qt4/5, so searching in
-        # default prefix location (/usr/local/Trolltech/ for Qt4 and /usr/local/
-        # for Qt5).
-        log "QTDIR not defined, trying to autodetect Qt version..."
-        if [ ! -d "/usr/local/Trolltech" ]; then
-            qt4_found=0
-        else
-            qt4_found=1
-        fi
-
-        local possible_qt5=`ls -1 /usr/local | grep "Qt-5*"`
-        if [ ${#possible_qt5} -ne 0 ]; then
-            qt5_found=1
-        else
-            qt5_found=0
-        fi
-
-        # Detect Qt4 path and version.
-        if [ ${qt4_found} -eq 1 ]; then
-            # Detecting installed Qt4 version.
-            # We are relying on assumption that Qt4 is installed in
-            # /usr/local/Trolltech. If you're installed Qt4 in other prefix
-            # you should specify QTDIR manually.
-            qt4_version=`ls /usr/local/Trolltech | grep Qt | awk '{print $NF}' | cut -d "-" -f 2`
-            if [ "${#qt4_version}" -eq 0 ]; then
-                log "Could not detect installed Qt4 version."
-            else
-                log "Detected Qt4 version: ${qt4_version}"
-            fi
-        fi
-
-        # Detect Qt5 path and version
-        if [ ${qt5_found} -eq 1 ]; then
-            # Detecting installed Qt5 version.
-            # We are relying on assumption that Qt5 is installed in
-            # /usr/local/. If you're installed Qt5 in other prefix
-            # you should specify QTDIR manually.
-            qt5_version=`echo ${possible_qt5} | grep Qt | awk '{print $NF}' | cut -d "-" -f 2`
-            if [ "${#qt5_version}" -eq 0 ]; then
-                log "Could not detect installed Qt5 version."
-            else
-                log "Detected Qt5 version: ${qt5_version}"
-            fi
-        fi
-
-        # If we found both Qt4 and Qt5, and "--prefer-qt5" wasn't passed - ask
-        # user which Qt version should we use.
-        if [ ${qt4_found} -eq 1 -a ${qt5_found} -eq 1 -a ${PREFER_QT5} -eq 0 ]; then
-            echo -n -e " \033[1;43m!\033[0m Detected both Qt4 and Qt5. Please, enter \"1\" to use Qt4, and \"2\" to use Qt5. "
-            read -n 1 qt_to_use
-            echo
-            if [ "${qt_to_use}" == "1" ]; then
-                log "Will use Qt4."
-                use_qt "${qt4_version}" "/usr/local/Trolltech/Qt-${qt4_version}"
-            elif [ "${qt_to_use}" == "2" ]; then
-                log "Will use Qt5."
-                use_qt "${qt5_version}" "/usr/local/Qt-${qt5_version}"
-            fi
-        elif [ ${qt4_found} -eq 1 -a ${qt5_found} -eq 1 -a ${PREFER_QT5} -eq 1 ]; then
-            log "Found both Qt4 and Qt5, but \"--prefer-qt5\" parameter was passed. Forcing Qt5."
-            use_qt "${qt5_version}" "/usr/local/Qt-${qt5_version}"
-        else
-            if [ ${qt4_found} -eq 1 -a ${qt5_found} -eq 0 ]; then
-                log "Will use Qt4."
-                use_qt "${qt4_version}" "/usr/local/Trolltech/Qt-${qt4_version}"
-            elif [ ${qt4_found} -eq 0 -a ${qt5_found} -eq 1 ]; then
-                log "Will use Qt5."
-                use_qt "${qt5_version}" "/usr/local/Qt-${qt5_version}"
-            fi
-        fi
-    fi
-}
-
-#####################################################################
-# This function checks for tools required to build Psi+.
-# It relies on QTDIR variable, that checked (or created) in
-# check_environment function.
-#####################################################################
-function check_tools_presence()
-{
-    # Detecting make binary path.
-    # It cannot be overrided from environment.
-    MAKE=`whereis make | awk {' print $1'}`
-
-    # Detecting qmake binary path.
-    # It cannot be overrided from environment.
-    QMAKE="${QTDIR}/bin/qmake"
-    if [ ! -f "${QMAKE}" ]; then
-        die "qmake not found! Please, install Qt from sources!"
-    fi
-    log "Found qmake binary: '${QMAKE}'"
-
-    # Detecting lrelease binary path.
-    # It cannot be overrided from environment.
-    LRELEASE="${QTDIR}/bin/lrelease"
-    if [ ! -f "${LRELEASE}" ]; then
-        die "lrelease not found! Please, install Qt from sources!"
-    fi
-    log "Found lrelease binary: '${LRELEASE}'"
-
-    # Detecting git binary path.
-    # It can be overrided with GIT environment variable (e.g.
-    # GIT=/usr/bin/git)
-    if [ ! -z "${GIT}" ]; then
-        log "Found git binary (from env): ${GIT}"
-    else
-        # We know default git path.
-        GIT="/usr/bin/git"
-        # Check that binary exists. Just in case :)
-        if [ ! -f "${GIT}" ]; then
-            die "Git binary not found! Why you deleted it?"
-        fi
-        log "Found git binary: '${GIT}'"
-    fi
-
-    # Detect PlistBuddy, which is used for making portable version of Psi+.
-    if [ ${PORTABLE} = 1 ]; then
-        if [ -x "/usr/libexec/PlistBuddy" ]; then
-		    log "Found PlistBuddy"
-        else
-            die "PlistBuddy not found. This tool is required to make Psi+ be portable."
-        fi
-	fi
-}
-
-#####################################################################
 # This function will compile plugins.
 #####################################################################
 function compile_plugins()
@@ -421,6 +258,10 @@ function compile_sources()
     if [ ${ENABLE_WEBKIT} -eq 1 ]; then
         local configure_opts="${configure_opts} --enable-webkit"
     fi
+
+    # Overwrite libraries and includes, so compilation process will use
+    # compiled specifically for this build libraries.
+    local configure_opts="${configure_opts} --with-idn-inc=${LIBIDN_INCLUDE} --with-idn-lib=${LIBIDN_LIBRARY} --with-qca-inc=${QCA_INCLUDE} --with-qca-lib=${QCA_LIBRARY} --with-zlib-inc=${MINIZIP_INCLUDE} --with-zlib-lib=${MINIZIP_LIBRARY}"
 
     # Put configure_opts into some scripts.
     sed -i "" "s@./configure@& ${configure_opts}@g" build_package.sh
@@ -525,85 +366,7 @@ function copy_resources()
 	fi
 }
 
-#####################################################################
-# This function created neccessary directory structure and defines
-# variables for each of four subdirectories.
-#####################################################################
-function create_directories()
-{
-    log "Creating directory structure..."
 
-    # Root directory for build process.
-    if [ ! -d "${PSI_DIR}" ]; then
-        log "Creating root directory: '${PSI_DIR}'"
-		mkdir -p "${PSI_DIR}" || die "Can't create work directory ${PSI_DIR}!"
-	fi
-
-    # Directory for dependencies handling.
-	if [ ! -d "${DEPS_DIR}" ]; then
-        log "Creating directory for dependencies: '${DEPS_DIR}'"
-		mkdir -p "${DEPS_DIR}" || die "Can't create work directory ${DEPS_DIR}!"
-	fi
-
-    # Directory for build process.
-    if [ -d "${PSI_DIR}/build" ]; then
-        log "Build directory exists, removing..."
-        rm -rf "${PSI_DIR}/build"
-    fi
-    log "Creating build directory: '${PSI_DIR}/build'"
-    mkdir -p "${PSI_DIR}/build"
-
-    # Directory for logs.
-    PSIBUILD_LOGS_PATH="${PSI_DIR}/logs"
-    if [ -d "${PSIBUILD_LOGS_PATH}" ]; then
-        log "Logs directory exists, removing..."
-        rm -rf "${PSIBUILD_LOGS_PATH}"
-    fi
-    log "Creating logs directory: '${PSIBUILD_LOGS_PATH}'"
-    mkdir -p "${PSIBUILD_LOGS_PATH}"
-
-}
-
-#####################################################################
-# This function installs required for build tools in ${PSI_DIR}/deps
-# directory.
-#####################################################################
-function install_build_deps()
-{
-    log "Installing build dependencies..."
-    # QConf.
-    if [ ${QT_VERSION_MAJOR} -eq 4 ]; then
-        local QCONFDIR="${PSI_DIR}/qconf-qt4"
-        export QMAKESPEC="macx-g++"
-    else
-        local QCONFDIR="${PSI_DIR}/qconf-qt5"
-    fi
-
-    if [ -f "${QCONFDIR}/qconf" ]; then
-        # Okay, qconf already compiled.
-        QCONF="${QCONFDIR}/qconf"
-        log "Found qconf binary: '${QCONF}'"
-    else
-        # qconf isn't found.
-        log "Installing qconf..."
-        mkdir -p "${QCONFDIR}" && cd $_
-        if [ ! -d ".git" ]; then
-            git clone "${GIT_REPO_DEP_QCONF}" .
-        else
-            git pull
-        fi
-        local qconf_conf_opts="--qtdir=${QTDIR}"
-        ./configure ${qconf_conf_opts}
-        if [ $? -ne 0 ]; then
-            action_failed "QConf sources configuration" "None"
-        fi
-        ${MAKE} ${MAKEOPTS} >> "${PSI_DIR}/logs/qconf-make.log" 2>&1
-        if [ $? -ne 0 ]; then
-            action_failed "QConf compilation" "${PSI_DIR}/logs/qconf-make.log"
-        fi
-        QCONF="${QCONFDIR}/qconf"
-    fi
-}
 
 #####################################################################
 # This function creates DMG file.
@@ -1038,10 +801,6 @@ Feature options:
 }
 
 
-# Prefer Qt5? By default we will try to search for Qt4.
-# Controlled with "--prefer-qt5" parameter.
-PREFER_QT5=0
-
 case $1 in
     --help)
         help
@@ -1052,11 +811,12 @@ case $1 in
     *)
         time_build_start=`date +'%s'`
         parse_cli_parameters $@
-        check_environment
-        check_tools_presence
-        create_directories
-        install_build_deps
+        . "${PSIBUILD_SCRIPT_PATH}/configure_env.lib.sh"
+        configure_env_prepare_environment
+        . "${PSIBUILD_SCRIPT_PATH}/build_deps.lib.sh"
+        build_deps_build
         obtain_sources
+        #exit
         prepare_sources
         compile_sources
         compile_plugins
