@@ -2,6 +2,10 @@
 DEP_PKGCONFIG_SOURCE_URL="https://pkg-config.freedesktop.org/releases/"
 DEP_PKGCONFIG_VERSION="0.29.1"
 DEP_PKGCONFIG_FILENAME="pkg-config-${DEP_PKGCONFIG_VERSION}.tar.gz"
+# autoconf
+DEP_AUTOCONF_SOURCE_URL="http://ftp.gnu.org/gnu/autoconf/"
+DEP_AUTOCONF_VERSION="2.69"
+DEP_AUTOCONF_FILENAME="autoconf-${DEP_AUTOCONF_VERSION}.tar.gz"
 # minizip
 DEP_MINIZIP_SOURCE_URL="http://zlib.net/"
 DEP_MINIZIP_VERSION="1.2.8"
@@ -31,6 +35,7 @@ DEP_PSIMEDIA_SOURCE_URL="https://github.com/psi-plus/psimedia.git"
 function build_deps_build()
 {
 	log "Building dependencies. This could take awhile..."
+    build_deps_autoconf
     build_deps_pkgconfig
 	build_deps_qconf
 	build_deps_minizip
@@ -54,6 +59,42 @@ function build_deps_detect_standalone()
 }
 
 #####################################################################
+# Autoconf installation/detection
+#####################################################################
+function build_deps_autoconf()
+{
+    log "Detecting autoconf..."
+    if [ ! -f "${PSIBUILD_DEPS_DIR}/dep_root/bin/autoconf" ]; then
+        log "Downloading autoconf sources..."
+        mkdir -p "${PSIBUILD_DEPS_DIR}/autoconf"
+        cd "${PSIBUILD_DEPS_DIR}/autoconf"
+        curl -L "${DEP_AUTOCONF_SOURCE_URL}/${DEP_AUTOCONF_FILENAME}" -o "${DEP_AUTOCONF_FILENAME}"
+        tar -xf "${DEP_AUTOCONF_FILENAME}"
+        cd "autoconf-${DEP_AUTOCONF_VERSION}"
+        log "Configuring autoconf..."
+        ./configure --prefix="${PSIBUILD_DEPS_DIR}/dep_root" >> "${PSIBUILD_LOGS_DIR}/autoconf-configure.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "autoconf configuration" "${PSI_DIR}/logs/autoconf-configure.log"
+        fi
+        log "Compiling autoconf..."
+        ${MAKE} ${MAKEOPTS} >> "${PSIBUILD_LOGS_DIR}/autoconf-make.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "autoconf compilation" "${PSI_DIR}/logs/autoconf-make.log"
+        fi
+        log "Installing autoconf..."
+        ${MAKE} install >> "${PSIBUILD_LOGS_DIR}/autoconf-install.log" 2>&1
+        if [ $? -ne 0 ]; then
+            action_failed "autoconf installation" "${PSI_DIR}/logs/autoconf-install.log"
+        fi
+    fi
+
+    export AUTOCONF="${PSIBUILD_DEPS_DIR}/dep_root/bin/autoconf"
+    export AUTORECONF="${PSIBUILD_DEPS_DIR}/dep_root/bin/autoreconf"
+    log "Detected autoconf: ${AUTOCONF}"
+    log "Detected autoreconf: ${AUTORECONF}"
+}
+
+#####################################################################
 # GStreamer installation/detection
 #####################################################################
 function build_deps_gstreamer()
@@ -68,13 +109,13 @@ function build_deps_gstreamer()
         cd "gstbundle-${DEP_GST_VERSION}-mac"
         log "Copying GStreamer to dep_root..."
         cp -R x86_64/* "${PSIBUILD_DEPS_DIR}/dep_root"
-    else
-        log "Detected GStreamer library:"
-        export GST_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/include"
-        export GST_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/libgstbase-0.10.0.dylib"
-        log "Include path: '${GST_INCLUDE}'"
-        log "Library path: '${GST_LIBRARY}'"
     fi
+
+    log "Detected GStreamer library:"
+    export GST_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/include"
+    export GST_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/libgstbase-0.10.0.dylib"
+    log "Include path: '${GST_INCLUDE}'"
+    log "Library path: '${GST_LIBRARY}'"
 }
 
 #####################################################################
@@ -92,13 +133,13 @@ function build_deps_growl()
         cd "Growl-${DEP_GROWL_VERSION}-SDK"
         log "Copying framework into '${PSIBUILD_DEPS_DIR}/dep_root/lib'..."
         cp -R Framework/Growl.framework "${PSIBUILD_DEPS_DIR}/dep_root/lib"
-    else
-        log "Detected Growl library:"
-        export GROWL_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/lib/Growl.framework/Versions/A/Headers"
-        export GROWL_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/Growl.framework/Versions/A/Growl"
-        log "Include path: '${GROWL_INCLUDE}'"
-        log "Library path: '${GROWL_LIBRARY}'"
     fi
+
+    log "Detected Growl library:"
+    export GROWL_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/lib/Growl.framework/Versions/A/Headers"
+    export GROWL_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/Growl.framework/Versions/A/Growl"
+    log "Include path: '${GROWL_INCLUDE}'"
+    log "Library path: '${GROWL_LIBRARY}'"
 }
 
 #####################################################################
@@ -129,13 +170,13 @@ function build_deps_libidn()
         if [ $? -ne 0 ]; then
             action_failed "libidn installation" "${PSI_DIR}/logs/libidn-install.log"
         fi
-    else
-        log "Found libidn library:"
-        export LIBIDN_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/include"
-        export LIBIDN_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/libidn.dylib"
-        log "Include path: '${LIBIDN_INCLUDE}'"
-        log "Library path: '${LIBIDN_LIBRARY}'"
     fi
+
+    log "Found libidn library:"
+    export LIBIDN_INCLUDE="${PSIBUILD_DEPS_DIR}/dep_root/include"
+    export LIBIDN_LIBRARY="${PSIBUILD_DEPS_DIR}/dep_root/lib/libidn.dylib"
+    log "Include path: '${LIBIDN_INCLUDE}'"
+    log "Library path: '${LIBIDN_LIBRARY}'"
 }
 
 #####################################################################
